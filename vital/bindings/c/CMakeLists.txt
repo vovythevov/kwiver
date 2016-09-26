@@ -19,6 +19,8 @@ set(vital_c_public_headers
   types/color.h
   types/covariance.h
   types/descriptor.h
+  types/detected_object.h
+  types/detected_object_type.h
   types/eigen.h
   types/feature.h
   types/image.h
@@ -64,6 +66,8 @@ set(vital_c_sources
   types/color.cxx
   types/covariance.cxx
   types/descriptor.cxx
+  types/detected_object.cxx
+  types/detected_object_type.cxx
   types/eigen.cxx
   types/feature.cxx
   types/image.cxx

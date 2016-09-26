@@ -77,11 +77,6 @@ public:
 
 
   /**
-   * @brief Create an empty object
-   */
-  detected_object();
-
-  /**
    * @brief Create detected object with bounding box and other attributes.
    *
    * @param bbox Bounding box surrounding detected object, in image coordinates.
@@ -134,6 +129,9 @@ public:
    */
   void set_confidence( double d );
 
+  uint64_t index() const;
+  void set_index( uint64_t idx );
+
   /**
    * @brief Get pointer to optional classifications object.
    *
@@ -158,6 +156,7 @@ public:
 private:
   std::shared_ptr< bounding_box_d > m_bounding_box;
   double m_confidence;
+  uint64_t m_index; ///< index for this object
 
   // The detection type is an optional list of possible object types.
   detected_object_type_sptr m_type;
