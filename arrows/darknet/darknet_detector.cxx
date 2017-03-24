@@ -33,6 +33,8 @@
 // kwiver includes
 #include <vital/logger/logger.h>
 #include <vital/util/cpu_timer.h>
+#include <vital/algo/dynamic_configuration.h>
+
 #include <arrows/ocv/image_container.h>
 #include <kwiversys/SystemTools.hxx>
 
@@ -77,6 +79,7 @@ public:
     , m_names( 0 )
     , m_boxes( 0 )
     , m_probs( 0 )
+    , m_scaling( 1.0 )
   { }
 
   ~priv()
@@ -102,6 +105,10 @@ public:
 
   box *m_boxes;                   /* detection boxes */
   float **m_probs;                /*  */
+
+  vital::algo::dynamic_configuration_sptr m_dynamic_config;
+
+  double m_scaling;
 };
 
 
@@ -128,13 +135,16 @@ get_configuration() const
   // Get base config from base class
   vital::config_block_sptr config = vital::algorithm::get_configuration();
 
-  config->set_value( "net_config", d->m_net_config, "Name of network config file." );
+  config->set_value( "net_config",  d->m_net_config, "Name of network config file." );
   config->set_value( "weight_file", d->m_weight_file, "Name of optional weight file." );
   config->set_value( "class_names", d->m_class_names, "Name of file that contains the class names." );
-  config->set_value( "thresh", d->m_thresh, "Threshold value." );
+  config->set_value( "thresh",      d->m_thresh, "Threshold value." );
   config->set_value( "hier_thresh", d->m_hier_thresh, "Hier threshold value." );
-  config->set_value( "gpu_index", d->m_gpu_index, "GPU index. Only used when darknet "
+  config->set_value( "gpu_index",   d->m_gpu_index, "GPU index. Only used when darknet "
 		     "is compiled with GPU support." );
+
+  vital::algo::dynamic_configuration::get_nested_algo_configuration("dynamic_config", config,
+                                                                    d->m_dynamic_config);
 
   return config;
 }
@@ -157,6 +167,9 @@ set_configuration( vital::config_block_sptr config_in )
   this->d->m_thresh      = config->get_value< float > ( "thresh" );
   this->d->m_hier_thresh = config->get_value< float > ( "hier_thresh" );
   this->d->m_gpu_index   = config->get_value< int > ( "gpu_index" );
+
+  vital::algo::dynamic_configuration::set_nested_algo_configuration("dynamic_config", config,
+                                                                    d->m_dynamic_config);
 
   /* the size of this array is a mystery - probably has to match some
    * constant in net description */
@@ -190,11 +203,18 @@ bool
 darknet_detector::
 check_configuration( vital::config_block_sptr config ) const
 {
+  bool success( true );
 
   std::string net_config = config->get_value<std::string>( "net_config" );
   std::string class_file = config->get_value<std::string>( "class_names" );
 
-  bool success( true );
+  // Get dynamic config provider
+  if (config->has_value("dynamic_config") &&
+      config->get_value<std::string>("dynamic_config") != "" &&
+      ! vital::algo::dynamic_configuration::check_nested_algo_configuration("dynamic_config", config))
+  {
+    success = false;
+  }
 
   if ( net_config.empty() )
   {
@@ -231,6 +251,17 @@ vital::detected_object_set_sptr
 darknet_detector::
 detect( vital::image_container_sptr image_data ) const
 {
+  // Get any dynamic configuration values
+  if (d->m_dynamic_config)
+  {
+    auto new_config = d->m_dynamic_config->get_dynamic_configuration();
+
+    if (new_config->has_value( "scaling" ) )
+    {
+      d->m_scaling = new_config->get_value<float>( "scaling" );
+    }
+  } // end dynamic config
+
   kwiver::vital::scoped_cpu_timer t( "Time to Detect Objects" );
   cv::Mat cv_image = kwiver::arrows::ocv::image_container::vital_to_ocv( image_data->get_image() );
 
