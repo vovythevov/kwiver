@@ -110,12 +110,18 @@ video_input_process
 void video_input_process
 ::_configure()
 {
+  start_configure_processing();
 
   // Examine the configuration
   d->m_config_video_filename = config_value_using_trait( video_filename );
   d->m_config_frame_time     = config_value_using_trait( frame_time ) * 1e6; // in usec
 
   kwiver::vital::config_block_sptr algo_config = get_config(); // config for process
+
+  if ( ! algo::video_input::check_nested_algo_configuration( "video_reader", algo_config ) )
+  {
+    throw sprokit::invalid_configuration_exception( name(), "Configuration check failed." );
+  }
 
   // instantiate requested/configured algo type
   algo::video_input::set_nested_algo_configuration( "video_reader", algo_config, d->m_video_reader );
@@ -124,11 +130,7 @@ void video_input_process
     throw sprokit::invalid_configuration_exception( name(), "Unable to create video_reader." );
   }
 
-  algo::video_input::get_nested_algo_configuration( "video_reader", algo_config, d->m_video_reader );
-  if ( ! algo::video_input::check_nested_algo_configuration( "video_reader", algo_config ) )
-  {
-    throw sprokit::invalid_configuration_exception( name(), "Configuration check failed." );
-  }
+  stop_configure_processing();
 }
 
 
@@ -137,10 +139,14 @@ void video_input_process
 void video_input_process
 ::_init()
 {
+  start_init_processing();
+
   // instantiate a video reader
   d->m_video_reader->open( d->m_config_video_filename ); // throws
 
   d->m_video_traits = d->m_video_reader->get_implementation_capabilities();
+
+  stop_init_processing();
 }
 
 
@@ -152,7 +158,9 @@ void video_input_process
 
   if ( d->m_video_reader->next_frame( ts ) )
   {
-      auto frame = d->m_video_reader->frame_image();
+    start_step_processing();
+
+    auto frame = d->m_video_reader->frame_image();
 
     // --- debug
 #if defined DEBUG
@@ -206,6 +214,8 @@ void video_input_process
       // Now that we have new metadata save it in case we need it later.
       d->m_last_metadata = metadata;
     }
+
+    stop_step_processing();
 
     push_to_port_using_trait( timestamp, ts );
     push_to_port_using_trait( image, frame );
